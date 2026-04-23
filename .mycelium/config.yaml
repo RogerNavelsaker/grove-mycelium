@@ -1,0 +1,35 @@
+project:
+  name: mycelium-cli
+  root: .
+  canonicalBranch: main
+pool:
+  database: .mycelium/tasks.db
+  defaultTtl: 300
+decomposer:
+  maxDepth: 3
+  runtime: claude
+  model: opus
+workers:
+  defaultCount: 3
+  runtime: claude
+  model: sonnet
+  idleTimeout: 60
+  pollInterval: 5
+  maxRetries: 2
+watcher:
+  pollInterval: 10
+  autoRedecompose: true
+worktrees:
+  baseDir: .mycelium/worktrees
+merge:
+  aiResolveEnabled: true
+  reimagineEnabled: false
+mulch:
+  enabled: true
+  domains: []
+seeds:
+  enabled: true
+  autoClose: true
+runtime:
+  default: claude
+  capabilities:

@@ -1,0 +1,47 @@
+[
+	{
+		"id": "group-75f26546",
+		"name": "phase1-core-and-tests",
+		"memberIssueIds": [
+			"mycelium-a97e",
+			"mycelium-7b65",
+			"mycelium-2ce4",
+			"mycelium-5ebb",
+			"mycelium-3da9",
+			"mycelium-1de2",
+			"mycelium-1fb9",
+			"mycelium-764d",
+			"mycelium-5ebc",
+			"mycelium-1ce4",
+			"mycelium-bbe9",
+			"mycelium-3553"
+		],
+		"status": "completed",
+		"createdAt": "2026-04-04T17:47:29.099Z",
+		"completedAt": "2026-04-04T18:18:00.907Z"
+	},
+	{
+		"id": "group-9cbe3649",
+		"name": "batch2-runtime-and-integration",
+		"memberIssueIds": [
+			"mycelium-114a",
+			"mycelium-845b",
+			"mycelium-502f",
+			"mycelium-0f09"
+		],
+		"status": "active",
+		"createdAt": "2026-04-04T18:22:16.420Z",
+		"completedAt": null
+	},
+	{
+		"id": "group-5b1d71b4",
+		"name": "batch3-final",
+		"memberIssueIds": [
+			"mycelium-3471",
+			"mycelium-a2ca"
+		],
+		"status": "active",
+		"createdAt": "2026-04-04T19:01:45.432Z",
+		"completedAt": null
+	}
+]

@@ -1,0 +1,179 @@
+#!/usr/bin/env bun
+export const VERSION = "0.1.1";
+
+import chalk from "chalk";
+import { Command, Help } from "commander";
+import { brand, muted, setQuiet } from "./output.ts";
+
+// Apply quiet mode early so it affects all output during command execution
+const rawArgs = process.argv.slice(2);
+if (rawArgs.includes("--quiet") || rawArgs.includes("-q")) {
+	setQuiet(true);
+}
+
+const program = new Command();
+
+program
+	.name("mc")
+	.description("mycelium — reactive agent swarm")
+	.version(VERSION, "-v, --version", "Print version")
+	.option("--json", "Output as JSON")
+	.option("-q, --quiet", "Suppress non-error output")
+	.option("--verbose", "Extra diagnostic output")
+	.option("--timing", "Show command execution time")
+	.addHelpCommand(false)
+	.configureHelp({
+		formatHelp(cmd: Command, helper: Help): string {
+			if (cmd.parent) {
+				return Help.prototype.formatHelp.call(helper, cmd, helper);
+			}
+			const header = `${brand(chalk.bold("mycelium"))} ${muted(`v${VERSION}`)} — Reactive agent swarm\n\nUsage: mc <command> [options]`;
+
+			const cmdLines: string[] = ["\nCommands:"];
+			for (const sub of cmd.commands) {
+				const name = sub.name();
+				const argStr = sub.registeredArguments
+					.map((a) => (a.required ? `<${a.name()}>` : `[${a.name()}]`))
+					.join(" ");
+				const rawEntry = argStr ? `${name} ${argStr}` : name;
+				const colored = argStr ? `${chalk.green(name)} ${chalk.dim(argStr)}` : chalk.green(name);
+				const pad = " ".repeat(Math.max(18 - rawEntry.length, 2));
+				cmdLines.push(`  ${colored}${pad}${sub.description()}`);
+			}
+
+			const opts: [string, string][] = [
+				["-h, --help", "Show help"],
+				["-v, --version", "Print version"],
+				["--json", "Output as JSON"],
+				["-q, --quiet", "Suppress non-error output"],
+				["--verbose", "Extra diagnostic output"],
+				["--timing", "Show command execution time"],
+			];
+			const optLines: string[] = ["\nOptions:"];
+			for (const [flag, desc] of opts) {
+				const pad = " ".repeat(Math.max(18 - flag.length, 2));
+				optLines.push(`  ${chalk.dim(flag)}${pad}${desc}`);
+			}
+
+			const footer = `\nRun '${chalk.dim("mc")} <command> --help' for command-specific help.`;
+
+			return `${[header, ...cmdLines, ...optLines, footer].join("\n")}\n`;
+		},
+	});
+
+// --timing: measure command execution time
+let timingStart = 0;
+program.hook("preAction", () => {
+	if (program.opts().timing) {
+		timingStart = performance.now();
+	}
+});
+program.hook("postAction", () => {
+	if (program.opts().timing) {
+		const elapsed = performance.now() - timingStart;
+		const formatted =
+			elapsed < 1000 ? `${Math.round(elapsed)}ms` : `${(elapsed / 1000).toFixed(2)}s`;
+		process.stderr.write(`${muted(`\u23F1 ${formatted}`)}\n`);
+	}
+});
+
+// Lazy-load and register all commands
+async function registerAll(): Promise<void> {
+	const mods = await Promise.all([
+		import("./commands/init.ts"),
+		import("./commands/decompose.ts"),
+		import("./commands/spawn.ts"),
+		import("./commands/status.ts"),
+		import("./commands/watch.ts"),
+		import("./commands/stop.ts"),
+		import("./commands/tasks.ts"),
+		import("./commands/show.ts"),
+		import("./commands/retry.ts"),
+		import("./commands/pool.ts"),
+		import("./commands/logs.ts"),
+		import("./commands/doctor.ts"),
+		import("./commands/prime.ts"),
+		import("./commands/sync.ts"),
+		import("./commands/upgrade.ts"),
+		import("./commands/completions.ts"),
+	]);
+
+	for (const mod of mods) {
+		mod.register(program);
+	}
+}
+
+function levenshtein(a: string, b: string): number {
+	const m = a.length;
+	const n = b.length;
+	const dp: number[][] = Array.from({ length: m + 1 }, () => Array(n + 1).fill(0) as number[]);
+	for (let i = 0; i <= m; i++) dp[i]![0] = i;
+	for (let j = 0; j <= n; j++) dp[0]![j] = j;
+	for (let i = 1; i <= m; i++) {
+		for (let j = 1; j <= n; j++) {
+			dp[i]![j] =
+				a[i - 1] === b[j - 1]
+					? dp[i - 1]![j - 1]!
+					: 1 + Math.min(dp[i - 1]![j]!, dp[i]![j - 1]!, dp[i - 1]![j - 1]!);
+		}
+	}
+	return dp[m]![n]!;
+}
+
+async function main(): Promise<void> {
+	// Handle --version --json before Commander processes the flag
+	if ((rawArgs.includes("-v") || rawArgs.includes("--version")) && rawArgs.includes("--json")) {
+		const platform = `${process.platform}-${process.arch}`;
+		console.log(
+			JSON.stringify({
+				name: "@os-eco/mycelium-cli",
+				version: VERSION,
+				runtime: "bun",
+				platform,
+			}),
+		);
+		process.exitCode = 0;
+		return;
+	}
+
+	await registerAll();
+
+	// Check for unknown commands before parsing
+	const firstArg = process.argv[2];
+	if (firstArg && !firstArg.startsWith("-")) {
+		const knownNames = program.commands.map((c) => c.name());
+		if (!knownNames.includes(firstArg)) {
+			let best = "";
+			let bestDist = Number.POSITIVE_INFINITY;
+			for (const name of knownNames) {
+				const d = levenshtein(firstArg, name);
+				if (d < bestDist) {
+					bestDist = d;
+					best = name;
+				}
+			}
+			if (bestDist <= 2) {
+				process.stderr.write(`Unknown command: ${firstArg}. Did you mean ${best}?\n`);
+			} else {
+				process.stderr.write(`Unknown command: ${firstArg}\n`);
+			}
+			process.exitCode = 1;
+			return;
+		}
+	}
+
+	await program.parseAsync(process.argv);
+}
+
+const jsonMode = process.argv.includes("--json");
+
+main().catch((err: unknown) => {
+	const msg = err instanceof Error ? err.message : String(err);
+	const cmd = process.argv[2];
+	if (jsonMode) {
+		console.log(JSON.stringify({ success: false, command: cmd, error: msg }));
+	} else {
+		console.error(chalk.red(`Error: ${msg}`));
+	}
+	process.exitCode = 1;
+});

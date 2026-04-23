@@ -1,0 +1,7 @@
+# Runtime state (not tracked)
+*.db
+*.db-wal
+*.db-shm
+worktrees/
+logs/
+config.local.yaml
